@@ -1,7 +1,37 @@
 import { NextFunction, Request, Response } from 'express'
 import type { Command, PowerStatus } from '@prisma/client'
 import { prisma } from '@/config/database'
-import { IngestSchema } from '../dto/ingest.dto'
+import { env } from '@/config/env'
+import { IngestSchema, type IngestDTO } from '../dto/ingest.dto'
+
+const DEFAULT_GAS_URL =
+  'https://script.google.com/macros/s/AKfycbwrWPH7UjAHjCwxnJb2kt2V68bjCvW9to0z9QsTrjRlxvbtH8YDJxFCTlRIyCBwTO4o/exec'
+
+function forwardToGoogleSheets(body: IngestDTO) {
+  const gasUrl = env.GAS_URL || DEFAULT_GAS_URL
+  if (!gasUrl) return
+
+  const statusName = body.status.charAt(0).toUpperCase() + body.status.slice(1).toLowerCase()
+  const sleepMin = Math.round((body.sleep_s ?? 900) / 60)
+  const predV = (body.predicted_v ?? body.vcap).toFixed(2)
+  const infoText = `${statusName} (${sleepMin} menit) | Prediction: ${predV}V`
+
+  const query = new URLSearchParams({
+    v: body.vcap.toFixed(2),
+    l: '100',
+    s: '100',
+    info: infoText,
+  })
+
+  fetch(`${gasUrl}?${query.toString()}`, { redirect: 'follow' })
+    .then(async (res) => {
+      const txt = await res.text()
+      console.log(`[GoogleSheets] Synced ${body.vcap.toFixed(2)}V -> ${txt.trim()}`)
+    })
+    .catch((err) => {
+      console.error('[GoogleSheets] Forward error:', err.message)
+    })
+}
 
 function toDeviceReply(cmd: Command | null) {
   if (!cmd) return { ok: true, cmd: 'none' }
@@ -31,7 +61,7 @@ export class IngestController {
       const device = req.device!
       const now = new Date()
 
-      const cmd = await prisma.$transaction(async (tx) => {
+      const cmd = await prisma.$transaction(async (tx: any) => {
         await tx.reading.create({
           data: {
             deviceId: device.id,
@@ -76,7 +106,9 @@ export class IngestController {
         return pending
       })
 
-      return res.status(200).json(toDeviceReply(cmd))
+      res.status(200).json(toDeviceReply(cmd))
+      forwardToGoogleSheets(body)
+      return
     } catch (error) {
       next(error)
     }

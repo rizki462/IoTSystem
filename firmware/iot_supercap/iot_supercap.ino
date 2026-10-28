@@ -46,20 +46,20 @@ static const int PIN_VCAP = 0;   // GPIO0 (ADC1_CH0): titik tengah divider Vsys
 static const int PIN_LED = 8;    // LED onboard Super Mini, ACTIVE-LOW
 
 // Pembacaan tegangan
-static const float VCAP_DIVIDER = 2.0f;  // (100k+100k)/100k
-static const float VCAP_CAL = 1.00f;     // Kalibrasi: Vmultimeter / Vterbaca
+static const float VCAP_DIVIDER = 2.15f;  // Kalibrasi kompensasi sag impedansi divider 100k
+static const float VCAP_CAL = 1.00f;     // Kalibrasi tambahan: Vmultimeter / Vterbaca
 static const int ADC_SAMPLES = 8;
 
 // Penjadwalan (sama seperti firmware lama)
-static const float MIN_WIFI_VOLTAGE = 3.80f;  // Di bawah ini: tidak nyalakan WiFi
+static const float MIN_WIFI_VOLTAGE = 3.60f;  // Batas cutoff WiFi (3.60V aman & ramah pagi/mendung)
 static const uint32_t SLEEP_SAFE_S = 900;     // 15 menit
-static const uint32_t SLEEP_MEDIUM_S = 1800;  // 30 menit
-static const uint32_t SLEEP_CRITICAL_S = 3600;  // 60 menit
+static const uint32_t SLEEP_MEDIUM_S = 1500;  // 25 menit
+static const uint32_t SLEEP_CRITICAL_S = 2400;  // 40 menit
 static const float ARIMA_CONST = 4.3387f;
 static const float ARIMA_AR1 = 0.8297f;
 
 // Jaringan
-static const wifi_power_t WIFI_TX_POWER = WIFI_POWER_2dBm;  // Naikkan ke WIFI_POWER_8_5dBm jika sering gagal konek
+static const wifi_power_t WIFI_TX_POWER = WIFI_POWER_2dBm;  // Daya pancar Rendah
 static const uint32_t FAST_CONNECT_MS = 4000;   // Jalur cepat (BSSID tersimpan)
 static const uint32_t SLOW_CONNECT_MS = 8000;   // Per AP, jalur biasa
 static const uint32_t HTTP_TIMEOUT_MS = 6000;
@@ -124,6 +124,10 @@ static void armFailsafe() {
 // ------------------------------ SENSOR & LOGIKA ------------------------------
 static float readVcap() {
   analogSetPinAttenuation(PIN_VCAP, ADC_11db);
+  // Buang 1 sampel awal untuk mengisi kapasitor sampling ADC agar stabil
+  analogReadMilliVolts(PIN_VCAP);
+  delay(1);
+
   uint32_t sumMv = 0;
   for (int i = 0; i < ADC_SAMPLES; i++) {
     sumMv += analogReadMilliVolts(PIN_VCAP);

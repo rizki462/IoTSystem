@@ -2,9 +2,9 @@ import { z } from 'zod'
 
 export const IngestSchema = z.object({
   device_id: z.string().min(1).max(64),
-  vcap: z.number().min(0).max(6, 'vcap di luar rentang wajar'),
+  vcap: z.number().min(0).max(10, 'vcap di luar rentang wajar'),
   status: z.enum(['safe', 'medium', 'critical']),
-  predicted_v: z.number().min(0).max(6).optional(),
+  predicted_v: z.number().min(0).max(10).optional(),
   sleep_s: z.number().int().min(0).max(86400).optional(),
   reset_reason: z.string().max(32).optional(),
   boot_count: z.number().int().min(0).optional(),
